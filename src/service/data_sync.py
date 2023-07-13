@@ -9,10 +9,11 @@ import requests
 from ldap3 import Server, Connection, SYNC, Tls, SIMPLE, ALL
 
 from . import auth
+from ..database import crud
 
 TEAMS_TO_EXCLUDE = []
 class Team:
-    '''team class'''
+    '''A class to hold team information'''
     def __init__(self, distinguished_name: str, parent: str, members: list, display_name: str):
         self.distinguished_name = distinguished_name
         self.parent = parent
@@ -20,11 +21,11 @@ class Team:
         self.display_name = display_name
 
 def replace_special_characters(string):
-    '''replace special characters'''
+    '''Replace special characters with underscore in the string'''
     return re.sub(r'[^\w()&\s_-]', '_', string)
 
 def send_webhook(msg_list: str):
-    """ send webhook message """
+    """ Sends webhook message to the specified URL """
     webhook_url = "YOUR_WEBHOOK_URL"
     log_msg = {
         "text": "\n".join(msg_list)
@@ -35,28 +36,29 @@ def send_webhook(msg_list: str):
 def make_request(
     method,
     path,
+    access_token,
     retry_after=1,
     base_url="https://openapi.swit.io/v1/api",
     **kwargs
 ):
-    '''make request to swit api'''
+    '''Makes request to the Swit API with the specified method, path and headers'''
     if method not in ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']:
         raise ValueError('Unsupported HTTP method')
 
-    headers = { # prod
+    headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {os.getenv('SWIT_ACCESS_TOKEN')}"
+        "Authorization": f"Bearer {access_token}"
     }
 
     try:
         res = requests.request(method, base_url+path, headers=headers, **kwargs)
-        time.sleep(0.5)
-        if res.status_code == 401: # token expire
+        time.sleep(0.5) # To prevent rate limit issues
+        if res.status_code == 401: # token expired
             auth.token_refresh()
-            send_webhook(["token refresh"])
-            res = make_request(method, path, retry_after, **kwargs)
+            send_webhook(["Token refreshed"])
+            res = make_request(method, path, access_token, retry_after, **kwargs)
 
-        if res.status_code == 429:
+        if res.status_code == 429: # Too many requests
             err_msg_list = []
             err_msg_list.append(json.dumps(res.json()))
             err_msg_list.append(json.dumps(kwargs))
@@ -66,7 +68,7 @@ def make_request(
             time.sleep(retry_after)
             # Make the request again
             if retry_after < 5:
-                res = make_request(method, path, retry_after+1, **kwargs)
+                res = make_request(method, path, access_token, retry_after+1, **kwargs)
         return res
     except requests.exceptions.ConnectionError as err:
         err_msg_list = []
@@ -76,21 +78,21 @@ def make_request(
         time.sleep(retry_after)
         # Make the request again
         if retry_after < 5:
-            res = make_request(method, path, retry_after+1, **kwargs)
+            res = make_request(method, path, access_token, retry_after+1, **kwargs)
         return res
 
 def sync_ad_to_swit(
     ad_sync: dict,
     log_msg_list: list
 ):
-    '''provision from AD to Swit'''
+    '''This function is responsible for the synchronization of data from Active Directory (AD) to Swit'''
     # get swit users
     def _get_swit_users():
         page = 0
         swit_users = []
         while True:
             page += 1
-            res = make_request('GET','/organization.user.list',
+            res = make_request('GET','/organization.user.list', access_token,
                 params={
                     'cnt':1000,
                     'page':page,
@@ -115,7 +117,7 @@ def sync_ad_to_swit(
         return ad_swit_user_mapped
     # Get teams
     def _get_swit_teams_by_ref():
-        res = make_request('GET','/user.team.list',timeout=10)
+        res = make_request('GET','/user.team.list',access_token,timeout=10)
         swit_teams = res.json()['data']['team']
         swit_teams_by_ref = {team['reference']:team for team in swit_teams if team['reference']}
         return swit_teams_by_ref, swit_teams[0]['team_id']
@@ -146,6 +148,15 @@ def sync_ad_to_swit(
 
         return ad_teams
 
+    # 이름, 전화번호 채우기
+    def _is_diff_name(swit_user, idp_user):
+        return swit_user["user_name"] != idp_user['idp_displayName']
+
+    # 변경할 전화번호인지 여부
+    def _is_update_tel(swit_user_mapped, idp_user):
+        if not idp_user.get('idp_mobile'):
+            return False
+        return swit_user_mapped[idp_user['swit_user_id']].get('tel', '') != idp_user['idp_mobile']
     def _make_err_msg(res: requests.Response) -> str:
         return f"swit api error\nstatus_code : {res.status_code}\nerror message : {res.text}"
 
@@ -154,13 +165,18 @@ def sync_ad_to_swit(
     swit_teams_by_ref,root_team_id = _get_swit_teams_by_ref()
     ad_teams = _get_ad_teams()
 
+    with crud.get_db_session() as db_session:
+        token_info = crud.get_swit_user_token(db_session)
+        if not token_info:
+            raise Exception("swit user token not found")
+        access_token = token_info.access_token
     # Create or update teams
     print("팀 생성 로직 시작 ...")
     for team in ad_teams:
         if team.distinguished_name not in swit_teams_by_ref:
             # create
             log_msg_list.append(f"created team name : {team.display_name}")
-            res = make_request('POST','/team.create',
+            res = make_request('POST','/team.create', access_token,
                 json={
                     'name':team.display_name,
                     'reference':team.distinguished_name,
@@ -187,7 +203,7 @@ def sync_ad_to_swit(
             parent_swit_team["team_id"] != swit_team['parent_id']:
             # update team info
             log_msg_list.append(f"updated team name : {swit_team['team_name']} -> {team.display_name}")
-            res = make_request('POST','/team.update',
+            res = make_request('POST','/team.update',access_token,
                 json={
                     'id':swit_team['team_id'],
                     'reference':swit_team['reference'],
@@ -205,7 +221,7 @@ def sync_ad_to_swit(
         # add members
         members_to_add = current_team_member_ids-past_team_member_ids
         if members_to_add:
-            res = make_request('POST','/team.user.add',json={
+            res = make_request('POST','/team.user.add',access_token,json={
                 'id':swit_team['team_id'],
                 'user_ids':list(members_to_add)
             },timeout=10)
@@ -215,7 +231,7 @@ def sync_ad_to_swit(
         # remove members
         members_to_remove = past_team_member_ids-current_team_member_ids
         if members_to_remove:
-            res = make_request('POST','/team.user.remove',json={
+            res = make_request('POST','/team.user.remove',access_token,json={
                 'id':swit_team['team_id'],
                 'user_ids':list(members_to_remove)
             },timeout=10)
@@ -232,7 +248,7 @@ def sync_ad_to_swit(
         team_name = swit_team['team_name']
         if not team_name.startswith(prefix):
             team_name = prefix + team_name
-        res = make_request('POST','/team.update',json={
+        res = make_request('POST','/team.update',access_token,json={
             'id':swit_team['team_id'],
             'reference':team_dn,
             'name':team_name,
@@ -242,21 +258,14 @@ def sync_ad_to_swit(
         if not res.ok:
             log_msg_list.append(_make_err_msg(res))
     print("팀 삭제 로직 종료 ...")
-    # 이름, 전화번호 채우기
-    def _is_diff_name(swit_user, idp_user):
-        return swit_user["user_name"] != idp_user['idp_displayName']
-
-    # 변경할 전화번호인지 여부
-    def _is_update_tel(swit_user_mapped, idp_user):
-        if not idp_user.get('idp_mobile'):
-            return False
-        return swit_user_mapped[idp_user['swit_user_id']].get('tel', '') != idp_user['idp_mobile']
 
     swit_user_id_mapped = {
         swit_user['user_id']: swit_user
         for swit_user in swit_users
     }
     print("유저 정보 동기화 로직 시작 ...")
+    # Because our Core API does not support updating individual users' basic profile info yet (planned to support
+    # by this year), we're currently using SCIM API instead.
     updated_count = 0
     for idp_user in idp_swit_user_mapped.values():
         request_body = {}
@@ -287,6 +296,7 @@ def sync_ad_to_swit(
             make_request(
                 "PATCH",
                 f"/scim/v2/Users/{idp_user['swit_user_id']}",
+                access_token,
                 base_url="https://saml.swit.io",
                 json=request_body,
                 timeout=10
@@ -299,6 +309,7 @@ def sync_ad_to_swit(
     return "end"
 
 def swit_user_update():
+    '''This function updates the Swit users based on the latest data from AD'''
     print("idp 조직정보 가져오기 시작 ...")
     log_msg_list = []
     tls_config = Tls(validate=ssl.CERT_REQUIRED, version=ssl.PROTOCOL_TLSv1_2)

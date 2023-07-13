@@ -23,7 +23,7 @@ def run_continuously(
 
 def background_job():
     header = {
-        "x-secret-key": os.getenv("X_SECRET_KEY")
+        "x-secret-key": os.getenv("OPERATION_AUTH_KEY")
     }
 
     res1 = requests.post("http://localhost:5503/user_update",headers=header,timeout=10)

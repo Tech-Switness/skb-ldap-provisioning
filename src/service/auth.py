@@ -4,6 +4,9 @@ from typing import Final
 
 import requests
 
+from src.database import crud
+
+
 # from ..database import crud
 
 class GetTokenException(Exception):
@@ -32,30 +35,23 @@ def token_refresh(
         "Accept": "application/json"
     }
 
-    data_obj: Final[dict] = {
-        "grant_type": "refresh_token",
-        "client_id": os.getenv("CLIENT_ID"),
-        "client_secret": os.getenv("CLIENT_SECRET"),
-        "refresh_token": os.getenv("SWIT_REFRESH_TOKEN") # token.refresh_token
-    }
+    with crud.get_db_session() as db_session:
+        token_info = crud.get_swit_user_token(db_session)
+        data_obj: Final[dict] = {
+            "grant_type": "refresh_token",
+            "client_id": os.getenv("CLIENT_ID"),
+            "client_secret": os.getenv("CLIENT_SECRET"),
+            "refresh_token": token_info.refresh_token
+        }
 
-    token_url = "https://openapi.swit.io/oauth/token"
+        token_url = "https://openapi.swit.io/oauth/token"
 
-    refresh_token = get_token(token_url, header_obj, data_obj)
+        refresh_token = get_token(token_url, header_obj, data_obj)
 
-    print("token refresh before")
-    print(f"access token : {os.getenv('SWIT_ACCESS_TOKEN')}")
-    print(f"refresh token : {os.getenv('SWIT_REFRESH_TOKEN')}")
-    os.environ["SWIT_REFRESH_TOKEN"] = refresh_token["refresh_token"]
-    os.environ["SWIT_ACCESS_TOKEN"] = refresh_token["access_token"]
-    print("token refresh after")
-    print(f"access token : {os.getenv('SWIT_ACCESS_TOKEN')}")
-    print(f"refresh token : {os.getenv('SWIT_REFRESH_TOKEN')}")
+        crud.update_swit_user_token(
+            db_session,
+            access_token=refresh_token["access_token"],
+            refresh_token=refresh_token["refresh_token"]
+        )
 
-    # crud.update_swit_user_token(
-    #     db_session,
-    #     access_token=refresh_token["access_token"],
-    #     refresh_token=refresh_token["refresh_token"]
-    # )
-
-    # return crud.get_swit_user_token(db_session)
+    return crud.get_swit_user_token(db_session)

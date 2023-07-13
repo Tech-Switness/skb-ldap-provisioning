@@ -15,22 +15,25 @@ def get_db_session():
     """ create database local session """
     db_session = sessionLocal()
     try:
-        yield db_session
+        return db_session
     finally:
         db_session.close()
 
-# swit bot user token
+def close_db_session(db_session: Session):
+    """ close database local session """
+    db_session.close()
+
+# swit service user token
 def get_swit_user_token(
     db_session: Session,
     token_id: int = 1
 ):
     """ get swit user token record from cloud sql """
-    stmt = select(model.SwitUserToken).where(model.SwitUserToken.token_id == token_id)
-    return db_session.scalar(stmt)
+    statement = select(model.SwitUserToken).where(model.SwitUserToken.token_id == token_id)
+    return db_session.scalar(statement)
 
 def insert_swit_user_token(
     db_session: Session,
-    swit_user_id: str,
     access_token: str,
     refresh_token: str,
     token_id: int = 1
@@ -40,14 +43,12 @@ def insert_swit_user_token(
         update_swit_user_token(
             db_session,
             token_id,
-            swit_user_id=swit_user_id,
             access_token=access_token,
             refresh_token=refresh_token
         )
         return
 
     swit_user_token = model.SwitUserToken(
-        swit_user_id,
         access_token,
         refresh_token
     )
@@ -58,14 +59,11 @@ def insert_swit_user_token(
 def update_swit_user_token(
     db_session: Session,
     token_id: int = 1,
-    swit_user_id: str = "",
     access_token: str = "",
     refresh_token: str = "",
 ):
     """ update swit user token """
     swit_user_token = get_swit_user_token(db_session, token_id)
-    if swit_user_id:
-        swit_user_token.swit_user_id = swit_user_id
     if access_token:
         swit_user_token.access_token = access_token
     if refresh_token:
