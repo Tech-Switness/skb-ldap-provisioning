@@ -1,12 +1,12 @@
 """ database model """
-from sqlalchemy import Column, String, Boolean, Integer
+from sqlalchemy import Column, String, Integer
 from sqlalchemy.ext.declarative import declarative_base
 
-base_model = declarative_base()
+BaseModel = declarative_base()
 
-class SwitUserToken(base_model):
+class SwitUserToken(BaseModel):
     """ swit user token (bot user)"""
-    __tablename__ = 'swit_user_token'
+    __tablename__ = 'swit_admin_token'
 
     token_id = Column(Integer, primary_key=True, nullable=False)
     access_token = Column(String(500), nullable=False)

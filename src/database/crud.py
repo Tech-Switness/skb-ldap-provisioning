@@ -4,10 +4,10 @@ from sqlalchemy.orm import Session, sessionmaker
 
 # from src.setting import config
 from . import connect
-from . import model
+from . import models
 
 engine = connect.connect_sql()
-model.base_model.metadata.create_all(engine)
+models.BaseModel.metadata.create_all(engine)
 
 sessionLocal = sessionmaker(engine)
 
@@ -23,13 +23,13 @@ def close_db_session(db_session: Session):
     """ close database local session """
     db_session.close()
 
-# swit service user token
+# swit services user token
 def get_swit_user_token(
     db_session: Session,
     token_id: int = 1
 ):
     """ get swit user token record from cloud sql """
-    statement = select(model.SwitUserToken).where(model.SwitUserToken.token_id == token_id)
+    statement = select(models.SwitUserToken).where(models.SwitUserToken.token_id == token_id)
     return db_session.scalar(statement)
 
 def insert_swit_user_token(

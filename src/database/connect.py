@@ -1,24 +1,20 @@
 """ google cloud sql 연결 """
-import os
-
-import pymysql
 import sqlalchemy
+
+from src.core.constants import DB_USERNAME, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME
+
 
 def connect_sql() -> sqlalchemy.engine.base.Engine:
     """ connect sql """
     return connect_with_connector()
 
+
 def connect_with_connector() -> sqlalchemy.engine.base.Engine:
     """ sqlalchemy engine 가져오기 """
 
-    db_user = os.getenv("DB_USERNAME")
-    db_pass = os.getenv("DB_PASSWORD")
-    db_name = os.getenv("DB_NAME")
-    db_host = os.getenv("DB_HOST")
-    db_port = os.getenv("DB_PORT")
-
     # Define the MySQL URL
-    url = f"mysql+pymysql://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
+    url = (f"mysql+pymysql://{DB_USERNAME}:{DB_PASSWORD}"
+           f"@{DB_HOST}:{DB_PORT}/{DB_NAME}")
 
     # Create the SQLAlchemy engine
     engine = sqlalchemy.create_engine(
