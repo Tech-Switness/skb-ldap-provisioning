@@ -2,9 +2,9 @@
 from sqlalchemy import Column, String, Integer
 from sqlalchemy.ext.declarative import declarative_base
 
-BaseModel = declarative_base()
+Base = declarative_base()
 
-class SwitUserToken(BaseModel):
+class SwitUserToken(Base):
     """ swit user token (bot user)"""
     __tablename__ = 'swit_admin_token'
 
@@ -17,10 +17,11 @@ class SwitUserToken(BaseModel):
         access_token: str,
         refresh_token: str,
         token_id: int = 1
-    ):
+    ) -> None:
         self.token_id = token_id
         self.access_token = access_token
         self.refresh_token = refresh_token
 
-    def __repr__(self):
-        return f"SwitUserToken(token_id={self.token_id!r},access_token={self.access_token!r},refresh_token={self.refresh_token!r})"
+    def __repr__(self) -> str:
+        return (f"SwitUserToken(token_id={self.token_id!r},access_token={self.access_token!r}"
+                f",refresh_token={self.refresh_token!r})")

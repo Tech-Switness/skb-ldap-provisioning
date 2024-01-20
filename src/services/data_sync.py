@@ -2,13 +2,15 @@
 import threading
 import time
 import re
+from collections import Counter
+
 import requests
 
-from typing import Optional
+from typing import Optional, Any
 
 from src.services.idp_data import import_idp_users, import_idp_teams
-from src.services.swit_api_client import authenticated_requests
-from src.services.swit_data import get_existing_swit_users, get_existing_swit_teams, SwitTeam, \
+from src.services.swit_api_client import AuthenticatedRequests
+from src.services.swit_dtos import SwitTeam, SwitUser, \
     SwitTeamRequest, SwitUserRoleEnum, SwitUserRequest
 from src.core.logger import provisioning_logger as logger, SwitWebhookBufferingHandler
 
@@ -23,9 +25,21 @@ class SyncToSwit:
 
     def __init__(self) -> None:
         print("Starting data sync from the IdP to Swit in a separate thread...")
-        self.thread = threading.Thread(target=self._sync_process)
+        self.thread = threading.Thread(target=self._sync_process_wrapper)
+
+    def _sync_process_wrapper(self) -> None:
+        try:
+            self._sync_process()
+        except Exception as e:
+            logger.exception(e)
+        finally:
+            for handler in logger.handlers:
+                if isinstance(handler, SwitWebhookBufferingHandler):
+                    handler.flush()
 
     def _sync_process(self) -> None:
+        # Initialize Swit API client
+        self.requests = AuthenticatedRequests().requests
         # Fetching existing data from IdP and Swit
         self._idp_users = import_idp_users()
         self._idp_teams = import_idp_teams(self._idp_users)
@@ -36,14 +50,58 @@ class SyncToSwit:
         self._create_teams()
         self._update_teams()
         self._sort_teams()
-        for handler in logger.handlers:
-            if isinstance(handler, SwitWebhookBufferingHandler):
-                handler.flush()
+
+    def _get_existing_swit_users(self) -> dict[str, SwitUser]:
+        """Get existing swit users"""
+        # Request for all users
+        page = 0
+        swit_users = []
+        while True:
+            page += 1
+            res = self.requests('GET', '/organization.user.list',
+                                params={
+                                    'cnt': 1000,
+                                    'page': page,
+                                }, timeout=10)
+            new_users = res.json()['data']['users']
+            if not new_users:
+                break
+            swit_users += new_users
+
+        # Map swit users by email
+        swit_users_by_email = {
+            user_json['email']: SwitUser(**user_json)
+            for user_json in swit_users
+        }
+        return swit_users_by_email
+
+    def _get_existing_swit_teams(self) -> tuple[dict[str, SwitTeam], list[SwitTeam], str]:
+        """Get existing swit teams"""
+        res = self.requests('GET', '/user.team.list', timeout=10)
+        raw_swit_teams: list[dict[str, Any]] = res.json()['data']['team']
+        root_team_id = next(team['team_id'] for team in raw_swit_teams if team['depth'] == 0)
+        all_swit_teams = [SwitTeam(**team_json) for team_json in raw_swit_teams]
+
+        # ATTENTION: Assert that all ref_ids are unique
+        ref_ids = [team.ref_id for team in all_swit_teams if team.ref_id]
+        counter = Counter(ref_ids)
+        duplicates = [ref_id for ref_id, count in counter.items() if count > 1]
+        assert not duplicates, f'Duplicated ref_id(s) from Swit: {duplicates}'
+
+        # ATTENTION: Exclude the root team and 'Unassigned' team
+        #  because they're not actual teams
+        all_swit_teams = [team for team in all_swit_teams
+                          if team.id != root_team_id and team.name != 'Unassigned']
+        swit_teams_by_ref = {
+            swit_team.ref_id: swit_team
+            for swit_team in all_swit_teams if swit_team.ref_id
+        }
+        return swit_teams_by_ref, all_swit_teams, root_team_id
 
     def _sync_users(self) -> None:
         print("Syncing users...")
         # Fetching existing data from Swit
-        swit_users_by_email = get_existing_swit_users()
+        swit_users_by_email = self._get_existing_swit_users()
         for idp_user in self._idp_users:
             swit_user = swit_users_by_email.get(idp_user.email)
 
@@ -55,8 +113,8 @@ class SyncToSwit:
                     email=idp_user.email,
                     phone_number=idp_user.phone_number,
                 ).model_dump(by_alias=True, exclude_none=True)
-                res = authenticated_requests('POST', '/organization.user.create',
-                                             json=swit_user_req_body, timeout=10)
+                res = self.requests('POST', '/organization.user.create',
+                                    json=swit_user_req_body, timeout=10)
                 if res.ok:
                     logger.info(f"Created user: {username}")
                 else:
@@ -67,8 +125,8 @@ class SyncToSwit:
 
             # Activate the user if inactive
             if not swit_user.is_active:
-                res = authenticated_requests('POST', '/organization.user.activate',
-                                             json={'id': swit_user.id}, timeout=10)
+                res = self.requests('POST', '/organization.user.activate',
+                                    json={'id': swit_user.id}, timeout=10)
                 if res.ok:
                     logger.info(f"Activated user: {swit_user.name}")
                 else:
@@ -93,7 +151,7 @@ class SyncToSwit:
             if not operations:
                 continue
 
-            res = authenticated_requests(
+            res = self.requests(
                 "PATCH",
                 f"https://saml.swit.io/scim/v2/Users/{swit_user.id}",
                 json={
@@ -111,7 +169,7 @@ class SyncToSwit:
 
     def _update_user_active_status(self) -> None:
         print("Updating user active status...")
-        swit_users_by_email = get_existing_swit_users()
+        swit_users_by_email = self._get_existing_swit_users()
         active_swit_user_emails = {swit_user.email for swit_user
                                    in swit_users_by_email.values()
                                    if swit_user.is_active}
@@ -125,10 +183,10 @@ class SyncToSwit:
                     or swit_user.role == SwitUserRoleEnum.ADMIN:
                 # ATTENTION: Do not deactivate admins
                 continue
-            res = authenticated_requests('POST',
-                                         '/organization.user.deactivate',
-                                         json={'user_id': swit_user.id},
-                                         timeout=10)
+            res = self.requests('POST',
+                                '/organization.user.deactivate',
+                                json={'user_id': swit_user.id},
+                                timeout=10)
             if res.ok:
                 logger.info(f"Deactivated user: {swit_user.name}")
             else:
@@ -143,10 +201,10 @@ class SyncToSwit:
                 # In case the user does not exist on Swit
                 continue
             swit_user = swit_users_by_email[email]
-            res = authenticated_requests('POST',
-                                         '/organization.user.activate',
-                                         json={'user_id': swit_user.id},
-                                         timeout=10)
+            res = self.requests('POST',
+                                '/organization.user.activate',
+                                json={'user_id': swit_user.id},
+                                timeout=10)
             if res.ok:
                 logger.info(f"Activated user: {swit_user.name}")
             else:
@@ -161,7 +219,7 @@ class SyncToSwit:
             If you want to hard-delete teams, use `POST /team.delete` instead.
         """
         print("Removing unused teams...")
-        swit_teams_by_ref, all_swit_teams, root_team_id = get_existing_swit_teams()
+        swit_teams_by_ref, all_swit_teams, root_team_id = self._get_existing_swit_teams()
         prefix = '(removed) '
         idp_team_ref_ids = {team.ref_id for team in self._idp_teams}
         for swit_team in all_swit_teams:
@@ -170,9 +228,9 @@ class SyncToSwit:
                 continue
             """
             # If you want to hard-delete teams, use this instead
-            res = authenticated_requests('POST', '/team.delete',
-                                         json={'id': swit_team.id},
-                                         timeout=10)
+            res = self.requests('POST', '/team.delete',
+                                 json={'id': swit_team.id},
+                                 timeout=10)
             continue
             """
             if swit_team.name.startswith(prefix):
@@ -183,9 +241,9 @@ class SyncToSwit:
                 name=_get_unique_team_name(prefix + swit_team.name, all_swit_teams),
                 parent_id=root_team_id,
             ).model_dump(by_alias=True, exclude_none=True)
-            res = authenticated_requests('POST', '/team.update',
-                                         json=new_swit_team_req_body,
-                                         timeout=10)
+            res = self.requests('POST', '/team.update',
+                                json=new_swit_team_req_body,
+                                timeout=10)
             if res.ok:
                 _construct_team_from_response(res, swit_team)
                 logger.info(f"Removed team: {swit_team.name}")
@@ -196,7 +254,7 @@ class SyncToSwit:
 
     def _create_teams(self) -> None:
         print("Creating teams...")
-        swit_teams_by_ref, all_swit_teams, root_team_id = get_existing_swit_teams()
+        swit_teams_by_ref, all_swit_teams, root_team_id = self._get_existing_swit_teams()
         for idp_team in self._idp_teams:
             # Create a new one if it doesn't exist on Swit
             if idp_team.ref_id not in swit_teams_by_ref:
@@ -205,9 +263,9 @@ class SyncToSwit:
                     ref_id=idp_team.ref_id,
                     parent_id=root_team_id
                 ).model_dump(by_alias=True, exclude_none=True)
-                res = authenticated_requests('POST', '/team.create',
-                                             json=new_swit_team_req_body,
-                                             timeout=10)
+                res = self.requests('POST', '/team.create',
+                                    json=new_swit_team_req_body,
+                                    timeout=10)
                 if res.ok:
                     new_swit_team = _construct_team_from_response(res)
                     logger.info(f"Created team: {new_swit_team.name}")
@@ -225,8 +283,8 @@ class SyncToSwit:
         because they can refer to each other
         """
         print("Updating teams...")
-        swit_teams_by_ref, all_swit_teams, root_team_id = get_existing_swit_teams()
-        swit_users_by_email = get_existing_swit_users()
+        swit_teams_by_ref, all_swit_teams, root_team_id = self._get_existing_swit_teams()
+        swit_users_by_email = self._get_existing_swit_users()
         for idp_team in self._idp_teams:
             swit_team = swit_teams_by_ref.get(idp_team.ref_id)
             if swit_team is None:
@@ -246,9 +304,9 @@ class SyncToSwit:
                     id=swit_team.id,
                     **fields_to_update
                 ).model_dump(by_alias=True, exclude_none=True)
-                res = authenticated_requests('POST', '/team.update',
-                                             json=new_swit_team_req_body,
-                                             timeout=10)
+                res = self.requests('POST', '/team.update',
+                                    json=new_swit_team_req_body,
+                                    timeout=10)
                 if res.ok:
                     _construct_team_from_response(res, swit_team)
                     logger.info(f"Updated team: {swit_team.name}")
@@ -266,10 +324,11 @@ class SyncToSwit:
             # Add members
             members_to_add = idp_team_user_ids - swit_team_user_ids
             if members_to_add:
-                res = authenticated_requests('POST', '/team.user.add', json={
-                    'id': swit_team.id,
-                    'user_ids': list(members_to_add)
-                }, timeout=10)
+                res = self.requests('POST', '/team.user.add',
+                                    json={
+                                        'id': swit_team.id,
+                                        'user_ids': list(members_to_add)
+                                    }, timeout=10)
                 if res.ok:
                     logger.info(f"Added {len(members_to_add)} members to team: {swit_team.name}")
                 else:
@@ -280,10 +339,11 @@ class SyncToSwit:
             # remove members
             members_to_remove = swit_team_user_ids - idp_team_user_ids
             if members_to_remove:
-                res = authenticated_requests('POST', '/team.user.remove', json={
-                    'id': swit_team.id,
-                    'user_ids': list(members_to_remove)
-                }, timeout=10)
+                res = self.requests('POST', '/team.user.remove',
+                                    json={
+                                        'id': swit_team.id,
+                                        'user_ids': list(members_to_remove)
+                                    }, timeout=10)
                 if res.ok:
                     logger.info(f"Removed {len(members_to_remove)} members from team: {swit_team.name}")
                 else:
@@ -293,7 +353,7 @@ class SyncToSwit:
 
     def _sort_teams(self) -> None:
         print("Sorting teams...")
-        swit_teams_by_ref, all_swit_teams, _ = get_existing_swit_teams()
+        swit_teams_by_ref, all_swit_teams, _ = self._get_existing_swit_teams()
         for idp_team in self._idp_teams:
             swit_team = swit_teams_by_ref.get(idp_team.ref_id)
             if swit_team is None:
@@ -315,10 +375,11 @@ class SyncToSwit:
             if not any(o1 != o2 for o1, o2 in zip(swit_team_children, swit_team_children_sorted)):
                 # If the children are already sorted
                 continue
-            res = authenticated_requests('POST', '/team.sort', json={
-                'parent_id': swit_team.id,
-                'team_ids': [team.id for team in swit_team_children_sorted]
-            }, timeout=10)
+            res = self.requests('POST', '/team.sort',
+                                json={
+                                    'parent_id': swit_team.id,
+                                    'team_ids': [team.id for team in swit_team_children_sorted]
+                                }, timeout=10)
             if res.ok:
                 logger.info(f"Sorted team: {swit_team.name}")
             else:

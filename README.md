@@ -38,13 +38,13 @@ Handles database operations.
 
 Contains various services that implement the application's business logic.
 
+- `provision_manager.py`: Manages the provisioning process to prevent concurrent executions.
 - `data_sync.py`: Manages the synchronization of data between the IdP and Swit.
 - `idp_data.py`: Handles importing data from the IdP.
-- `provision_manager.py`: Manages the provisioning process to prevent concurrent executions.
-- `scheduler.py`: Allows the application to execute tasks periodically.
 - `swit_api_client.py`: Manages interactions with the Swit API.
-- `swit_data.py`: Fetches data from Swit.
+- `swit_dtos.py`: Defines Swit object types.
 - `swit_oauth.py`: Implements OAuth helpers for Swit API authentication.
+- `scheduler.py`: Allows the application to execute tasks periodically.
 
 ### `tests/` Directory
 

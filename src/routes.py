@@ -28,17 +28,16 @@ def authenticate(func: Callable[..., Response]) -> Callable[..., Response]:
 @authenticate
 def provision_data() -> Response:
     provisioner = Provisioner()
-    if provisioner.start_provisioning_thread():
-        return Response("Started provisioning.", status=200)
-    else:
-        return Response("API is already in use.", status=409)
+    if not provisioner.start_provisioning_thread():
+        abort(409, "API is already in use.")
+    return Response("Started provisioning.", status=200)
 
 @api.route('/login')
 def login() -> werkzeug.wrappers.response.Response:
     """Login with Swit OAuth2"""
     state = secrets.token_hex(16)
     session['state'] = state
-    redirect_uri = request.url_root.strip('/') + url_for('oauth_callback')
+    redirect_uri = request.url_root.strip('/') + url_for(f'{api.name}.{oauth_callback.__name__}')
     if request.is_secure:
         redirect_uri = redirect_uri.replace('http://', 'https://')
     login_url = generate_login_url(redirect_uri, state)

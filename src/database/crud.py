@@ -3,15 +3,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 # from src.setting import config
-from . import connect
-from . import models
+from src.database import connect
+from src.database.models import SwitUserToken, Base
 
 engine = connect.connect_sql()
-models.BaseModel.metadata.create_all(engine)
+Base.metadata.create_all(engine)
 
 sessionLocal = sessionmaker(engine)
 
-def get_db_session():
+def get_db_session() -> Session:
     """ create database local session """
     db_session = sessionLocal()
     try:
@@ -19,17 +19,19 @@ def get_db_session():
     finally:
         db_session.close()
 
-def close_db_session(db_session: Session):
+def close_db_session(db_session: Session) -> None:
     """ close database local session """
     db_session.close()
 
 # swit services user token
 def get_swit_user_token(
-    db_session: Session,
-    token_id: int = 1
-):
+        db_session: Session,
+        token_id: int = 1
+) -> SwitUserToken | None:
     """ get swit user token record from cloud sql """
-    statement = select(models.SwitUserToken).where(models.SwitUserToken.token_id == token_id)
+    statement = select(
+        SwitUserToken
+    ).where(SwitUserToken.token_id == token_id)
     return db_session.scalar(statement)
 
 def insert_swit_user_token(
@@ -37,7 +39,7 @@ def insert_swit_user_token(
     access_token: str,
     refresh_token: str,
     token_id: int = 1
-):
+) -> None:
     """ insert swit user token """
     if get_swit_user_token(db_session, token_id):
         update_swit_user_token(
@@ -48,7 +50,7 @@ def insert_swit_user_token(
         )
         return
 
-    swit_user_token = model.SwitUserToken(
+    swit_user_token = SwitUserToken(
         access_token,
         refresh_token
     )
@@ -61,7 +63,7 @@ def update_swit_user_token(
     token_id: int = 1,
     access_token: str = "",
     refresh_token: str = "",
-):
+) -> SwitUserToken:
     """ update swit user token """
     swit_user_token = get_swit_user_token(db_session, token_id)
     if access_token:
@@ -70,3 +72,4 @@ def update_swit_user_token(
         swit_user_token.refresh_token = refresh_token
 
     db_session.commit()
+    return swit_user_token
