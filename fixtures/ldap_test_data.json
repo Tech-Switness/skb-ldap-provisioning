@@ -1,0 +1,266 @@
+{
+  "users": [
+    {
+      "distinguishedName": "CN=John Doe,OU=Users,DC=example,DC=com",
+      "mail": "johndoe@example.com",
+      "displayName": "John Doe",
+      "mobile": "+1234567890"
+    },
+    {
+      "distinguishedName": "CN=Jane Smith,OU=Users,DC=example,DC=com",
+      "mail": "janesmith@example.com",
+      "displayName": "Jane Smith",
+      "mobile": "+0987654321"
+    },
+    {
+      "distinguishedName": "CN=Bob Brown,OU=Users,DC=example,DC=com",
+      "mail": "bobbrown@example.com",
+      "displayName": "Bob Brown",
+      "mobile": null
+    },
+    {
+      "distinguishedName": "CN=Alice White,OU=Users,DC=example,DC=com",
+      "mail": "alicewhite@example.com",
+      "displayName": "Alice White",
+      "mobile": "+1122334455"
+    },
+    {
+      "distinguishedName": "CN=Charlie Black,OU=Users,DC=example,DC=com",
+      "mail": "charlieblack@example.com",
+      "displayName": "Charlie Black",
+      "mobile": "+1223456789"
+    },
+    {
+      "distinguishedName": "CN=Eve Green,OU=Users,DC=example,DC=com",
+      "mail": "evegreen@example.com",
+      "displayName": "Eve Green",
+      "mobile": null
+    },
+    {
+      "distinguishedName": "CN=Frank Blue,OU=Users,DC=example,DC=com",
+      "mail": "frankblue@example.com",
+      "displayName": "Frank Blue",
+      "mobile": "+1334567890"
+    },
+    {
+      "distinguishedName": "CN=Grace Yellow,OU=Users,DC=example,DC=com",
+      "mail": "graceyellow@example.com",
+      "displayName": "Grace Yellow",
+      "mobile": null
+    },
+    {
+      "distinguishedName": "CN=Hank Pink,OU=Users,DC=example,DC=com",
+      "mail": "hankpink@example.com",
+      "displayName": "Hank Pink",
+      "mobile": "+1445678901"
+    },
+    {
+      "distinguishedName": "CN=Ivy Brown,OU=Users,DC=example,DC=com",
+      "mail": "ivybrown@example.com",
+      "displayName": "Ivy Brown",
+      "mobile": "+1556789012"
+    },
+    {
+      "distinguishedName": "CN=Jack Green,OU=Users,DC=example,DC=com",
+      "mail": "jackgreen@example.com",
+      "displayName": "Jack Green",
+      "mobile": "+1667890123"
+    },
+    {
+      "distinguishedName": "CN=Kelly Blue,OU=Users,DC=example,DC=com",
+      "mail": "kellyblue@example.com",
+      "displayName": "Kelly Blue",
+      "mobile": "+1778901234"
+    },
+    {
+      "distinguishedName": "CN=Laura White,OU=Users,DC=example,DC=com",
+      "mail": "laurawhite@example.com",
+      "displayName": "Laura White",
+      "mobile": "+1889012345"
+    },
+    {
+      "distinguishedName": "CN=Michael Black,OU=Users,DC=example,DC=com",
+      "mail": "michaelblack@example.com",
+      "displayName": "Michael Black",
+      "mobile": "+1990123456"
+    },
+    {
+      "distinguishedName": "CN=Nancy Yellow,OU=Users,DC=example,DC=com",
+      "mail": "nancyyellow@example.com",
+      "displayName": "Nancy Yellow",
+      "mobile": "+1101234567"
+    },
+    {
+      "distinguishedName": "CN=Oliver Pink,OU=Users,DC=example,DC=com",
+      "mail": "oliverpink@example.com",
+      "displayName": "Oliver Pink",
+      "mobile": "+1212345678"
+    },
+    {
+      "distinguishedName": "CN=Paul Brown,OU=Users,DC=example,DC=com",
+      "mail": "paulbrown@example.com",
+      "displayName": "Paul Brown",
+      "mobile": "+1323456789"
+    },
+    {
+      "distinguishedName": "CN=Quincy Green,OU=Users,DC=example,DC=com",
+      "mail": "quincygreen@example.com",
+      "displayName": "Quincy Green",
+      "mobile": "+1434567890"
+    },
+    {
+      "distinguishedName": "CN=Rachel Blue,OU=Users,DC=example,DC=com",
+      "mail": "rachelblue@example.com",
+      "displayName": "Rachel Blue",
+      "mobile": "+1545678901"
+    },
+    {
+      "distinguishedName": "CN=Sam White,OU=Users,DC=example,DC=com",
+      "mail": "samwhite@example.com",
+      "displayName": "Sam White",
+      "mobile": "+1656789012"
+    }
+  ],
+  "groups": [
+    {
+      "distinguishedName": "CN=Developers,OU=Groups,DC=example,DC=com",
+      "displayName": "Developers",
+      "member": [
+        "CN=John Doe,OU=Users,DC=example,DC=com",
+        "CN=Jane Smith,OU=Users,DC=example,DC=com",
+        "CN=Charlie Black,OU=Users,DC=example,DC=com",
+        "CN=Eve Green,OU=Users,DC=example,DC=com",
+        "CN=Kelly Blue,OU=Users,DC=example,DC=com"
+      ],
+      "memberOf": [
+        "CN=Engineering,OU=Groups,DC=example,DC=com"
+      ]
+    },
+    {
+      "distinguishedName": "CN=Managers,OU=Groups,DC=example,DC=com",
+      "displayName": "Managers",
+      "member": [
+        "CN=Bob Brown,OU=Users,DC=example,DC=com",
+        "CN=Alice White,OU=Users,DC=example,DC=com",
+        "CN=Frank Blue,OU=Users,DC=example,DC=com",
+        "CN=Grace Yellow,OU=Users,DC=example,DC=com",
+        "CN=Laura White,OU=Users,DC=example,DC=com"
+      ],
+      "memberOf": [
+        "CN=Admin,OU=Groups,DC=example,DC=com"
+      ]
+    },
+    {
+      "distinguishedName": "CN=Engineering,OU=Groups,DC=example,DC=com",
+      "displayName": "Engineering",
+      "member": [
+        "CN=Developers,OU=Groups,DC=example,DC=com",
+        "CN=Testers,OU=Groups,DC=example,DC=com",
+        "CN=Architects,OU=Groups,DC=example,DC=com"
+      ],
+      "memberOf": [
+        "CN=Tech Division,OU=Groups,DC=example,DC=com"
+      ]
+    },
+    {
+      "distinguishedName": "CN=Testers,OU=Groups,DC=example,DC=com",
+      "displayName": "Testers",
+      "member": [
+        "CN=Michael Black,OU=Users,DC=example,DC=com",
+        "CN=Nancy Yellow,OU=Users,DC=example,DC=com",
+        "CN=Oliver Pink,OU=Users,DC=example,DC=com"
+      ],
+      "memberOf": [
+        "CN=Engineering,OU=Groups,DC=example,DC=com"
+      ]
+    },
+    {
+      "distinguishedName": "CN=Architects,OU=Groups,DC=example,DC=com",
+      "displayName": "Architects",
+      "member": [
+        "CN=Paul Brown,OU=Users,DC=example,DC=com",
+        "CN=Quincy Green,OU=Users,DC=example,DC=com"
+      ],
+      "memberOf": [
+        "CN=Engineering,OU=Groups,DC=example,DC=com"
+      ]
+    },
+    {
+      "distinguishedName": "CN=Tech Division,OU=Groups,DC=example,DC=com",
+      "displayName": "Tech Division",
+      "member": [
+        "CN=Engineering,OU=Groups,DC=example,DC=com",
+        "CN=Product Management,OU=Groups,DC=example,DC=com"
+      ],
+      "memberOf": [
+        "CN=Company,OU=Groups,DC=example,DC=com"
+      ]
+    },
+    {
+      "distinguishedName": "CN=Product Management,OU=Groups,DC=example,DC=com",
+      "displayName": "Product Management",
+      "member": [
+        "CN=Sam White,OU=Users,DC=example,DC=com",
+        "CN=Rachel Blue,OU=Users,DC=example,DC=com"
+      ],
+      "memberOf": [
+        "CN=Tech Division,OU=Groups,DC=example,DC=com"
+      ]
+    },
+    {
+      "distinguishedName": "CN=HR,OU=Groups,DC=example,DC=com",
+      "displayName": "HR",
+      "member": [
+        "CN=Hank Pink,OU=Users,DC=example,DC=com",
+        "CN=Ivy Brown,OU=Users,DC=example,DC=com",
+        "CN=Jack Green,OU=Users,DC=example,DC=com"
+      ],
+      "memberOf": [
+        "CN=Admin Division,OU=Groups,DC=example,DC=com"
+      ]
+    },
+    {
+      "distinguishedName": "CN=Admin Division,OU=Groups,DC=example,DC=com",
+      "displayName": "Admin Division",
+      "member": [
+        "CN=HR,OU=Groups,DC=example,DC=com",
+        "CN=Finance,OU=Groups,DC=example,DC=com"
+      ],
+      "memberOf": [
+        "CN=Company,OU=Groups,DC=example,DC=com"
+      ]
+    },
+    {
+      "distinguishedName": "CN=Finance,OU=Groups,DC=example,DC=com",
+      "displayName": "Finance",
+      "member": [
+        "CN=Grace Yellow,OU=Users,DC=example,DC=com",
+        "CN=Laura White,OU=Users,DC=example,DC=com"
+      ],
+      "memberOf": [
+        "CN=Admin Division,OU=Groups,DC=example,DC=com"
+      ]
+    },
+    {
+      "distinguishedName": "CN=Admin,OU=Groups,DC=example,DC=com",
+      "displayName": "Admin",
+      "member": [
+        "CN=Managers,OU=Groups,DC=example,DC=com",
+        "CN=HR,OU=Groups,DC=example,DC=com"
+      ],
+      "memberOf": [
+        "CN=Company,OU=Groups,DC=example,DC=com"
+      ]
+    },
+    {
+      "distinguishedName": "CN=Company,OU=Groups,DC=example,DC=com",
+      "displayName": "Company",
+      "member": [
+        "CN=Tech Division,OU=Groups,DC=example,DC=com",
+        "CN=Admin Division,OU=Groups,DC=example,DC=com",
+        "CN=Admin,OU=Groups,DC=example,DC=com"
+      ],
+      "memberOf": []
+    }
+  ]
+}

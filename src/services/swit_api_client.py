@@ -1,49 +1,49 @@
-""" Get Swit token """
+"""
+Makes request to the Swit API using the access token stored.
+"""
 import time
-import requests
+from httpx import Client, Response
 
 from typing import Any
 
-from src.core.constants import SWIT_BASE_URL
-from src.database.crud import get_db_session, get_swit_user_token
+from src.core.constants import settings
 from src.core.logger import provisioning_logger as logger
+from src.database import get_service_account
 from src.services.swit_oauth import refresh_access_token
 
-_SWIT_REST_API_BASE_URL = SWIT_BASE_URL+'/v1/api'
 
-class AuthenticatedRequests:
-    """Makes request to the Swit API with the specified method, path and headers
-        using the access token stored.
-    """
+class SwitApiClient(Client):
     def __init__(self) -> None:
-        with get_db_session() as db_session:
-            token_info = get_swit_user_token(db_session)
-            if not token_info:
-                raise Exception("Swit token not found")
-            self._token_info = token_info
+        super().__init__(
+            timeout=10,
+            base_url=settings.SWIT_BASE_URL + '/v1/api'
+        )
+        self._token_info = get_service_account()
+        self._update_token_header()
 
-    def requests(self, method: str, url: str, **kwargs: Any) -> requests.Response:
-        if not url.startswith('https://'):
-            url = _SWIT_REST_API_BASE_URL + url
-
-        res = requests.request(method, url, headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {self._token_info.access_token}"
-        }, **kwargs)
-        if res.status_code == 401 and not kwargs.get('refresh_tried'):  # token expired
+    def request(self, *args: Any, **kwargs: Any) -> Response:
+        res = super().request(*args, **kwargs)
+        if res.status_code == 401:
             refresh_access_token(self._token_info)
+            self._update_token_header()
             logger.info("Token refreshed")
-            kwargs['refresh_tried'] = True
-            res = self.requests(method, url, **kwargs)
+            res = super().request(*args, **kwargs)
 
-        retry_after = kwargs.get('retry_after', 0)
+        retry_after = int(res.request.headers.get('x-retry-after', '0'))
         if res.status_code == 429 and retry_after < 5:  # Too many requests
             # Wait the specified number of seconds
             retry_after += 1
-            logger.info(f"Too many requests. Waiting {retry_after} seconds for {url}...")
+            logger.info(f"Too many requests. Waiting {retry_after} seconds for {res.request.url}...")
             time.sleep(retry_after)
             # Make the request again
-            kwargs['retry_after'] = retry_after
-            res = self.requests(method, url, **kwargs)
+            res.request.headers.update({'x-retry-after': str(retry_after)})
+            kwargs['headers'] = res.request.headers
+            res = self.request(*args, **kwargs)
 
+        res.raise_for_status()
         return res
+
+    def _update_token_header(self) -> None:
+        self.headers.update({
+            "Authorization": f"Bearer {self._token_info.access_token}"
+        })

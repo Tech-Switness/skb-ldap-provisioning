@@ -1,9 +1,9 @@
 import logging
 from logging.handlers import BufferingHandler
 
-import requests
+from httpx import Client
 
-from src.core.constants import SWIT_WEBHOOK_URL
+from src.core.constants import settings
 
 
 class SwitWebhookBufferingHandler(BufferingHandler):
@@ -15,9 +15,12 @@ class SwitWebhookBufferingHandler(BufferingHandler):
         if not self.buffer:
             return
         messages = [self.format(record) for record in self.buffer]
-        payload = {"text": "\n".join(messages)}
-        assert SWIT_WEBHOOK_URL is not None
-        requests.post(SWIT_WEBHOOK_URL, json=payload, timeout=10)
+        if settings.SWIT_WEBHOOK_URL:
+            payload = {"text": "\n".join(messages)}
+            with Client() as client:
+                client.post(settings.SWIT_WEBHOOK_URL, json=payload, timeout=10)
+        else:
+            print(messages)
         self.buffer.clear()
 
     def shouldFlush(self, record: logging.LogRecord) -> bool:
@@ -38,7 +41,4 @@ console_handler.setLevel(logging.INFO)
 provisioning_logger.addHandler(console_handler)
 
 # Add webhook handler
-if SWIT_WEBHOOK_URL:
-    provisioning_logger.addHandler(SwitWebhookBufferingHandler())
-else:
-    print("As `SWIT_WEBHOOK_URL` is not set, SwitWebhookLoggingHandler is disabled.")
+provisioning_logger.addHandler(SwitWebhookBufferingHandler())

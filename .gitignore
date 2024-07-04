@@ -129,5 +129,6 @@ dmypy.json
 .pyre/
 .DS_Store
 
-# 관련
+# Custom
 .idea/
+*.db

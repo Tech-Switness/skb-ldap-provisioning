@@ -1,15 +1,18 @@
-from src.app import create_app
-from src.core.constants import IS_RUNNING_LOCALLY
-from src.services.scheduler import initialize_schedule, stop_scheduler_if_exists
+from werkzeug.serving import is_running_from_reloader
 
+from src.app import create_app
+from src.core.constants import settings
+from src.services.scheduler import scheduler
+
+app = create_app()
 
 if __name__ == "__main__":
-    app = create_app()
-    schedule_event, job = initialize_schedule()
     try:
+        if not is_running_from_reloader():
+            scheduler.initialize()
         app.run(
             host='0.0.0.0',
-            debug=IS_RUNNING_LOCALLY
+            debug=settings.IS_RUNNING_LOCALLY
         )
     finally:
-        stop_scheduler_if_exists(schedule_event, job)
+        scheduler.stop()

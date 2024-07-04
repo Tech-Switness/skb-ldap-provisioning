@@ -1,48 +1,47 @@
 import threading
 import time
+from typing import Optional
+
 import schedule
 
-from src.core.constants import SCHEDULE_TIME
-from src.services.provision_manager import Provisioner
+from src.core.constants import settings
+from src.services.provision_manager import provisioner
 
 
-def _run_continuously(
-        interval: int = 1
-) -> threading.Event:
-    cease_continuous_run = threading.Event()
+class _Scheduler:
+    def __init__(self) -> None:
+        self._event: Optional[threading.Event] = None
+        self._job: Optional[schedule.Job] = None
 
-    class ScheduleThread(threading.Thread):
-        @classmethod
-        def run(cls) -> None:
-            while not cease_continuous_run.is_set():
-                schedule.run_pending()
-                time.sleep(interval)
+    def initialize(self) -> None:
+        """Initialize scheduler"""
+        if not settings.SCHEDULE_TIME or self._job:
+            return None
+        self._run_continuously()
+        self._job = schedule.every().day.at(settings.SCHEDULE_TIME).do(provisioner.start)
+        print(f"Scheduled job: {self._job} at {settings.SCHEDULE_TIME}")
 
-    continuous_thread = ScheduleThread(name="idp_scheduler", daemon=True)
-    continuous_thread.start()
-    return cease_continuous_run
+    def stop(self) -> None:
+        """Stop scheduler if exists"""
+        if self._job:
+            schedule.cancel_job(self._job)
+            print(f"Cancelled job: {self._job}")
+        if self._event:
+            self._event.set()
+            print("Scheduler event set to cease continuous run.")
+
+    def _run_continuously(self) -> None:
+        self._event = event = threading.Event()
+
+        class ScheduleThread(threading.Thread):
+            @classmethod
+            def run(cls) -> None:
+                while not event.is_set():
+                    schedule.run_pending()
+                    time.sleep(60)
+
+        continuous_thread = ScheduleThread(name="idp_scheduler", daemon=True)
+        continuous_thread.start()
 
 
-def _background_job() -> None:
-    provisioner = Provisioner()
-    provisioner.start_provisioning_thread()
-
-
-def initialize_schedule() -> tuple[threading.Event | None, schedule.Job | None]:
-    """Initialize scheduler"""
-    schedule_event = job = None
-    if SCHEDULE_TIME:
-        schedule_event = _run_continuously()
-        job = schedule.every().day.at(SCHEDULE_TIME).do(_background_job)
-    return schedule_event, job
-
-
-def stop_scheduler_if_exists(
-        schedule_event: threading.Event | None,
-        job: schedule.Job | None
-) -> None:
-    """Stop scheduler if exists"""
-    if job:
-        schedule.cancel_job(job)
-    if schedule_event:
-        schedule_event.set()
+scheduler = _Scheduler()

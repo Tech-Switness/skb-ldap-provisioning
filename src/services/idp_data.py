@@ -1,105 +1,109 @@
-import csv
+import json
+import re
+from typing import Optional, TypedDict
 
-from collections import Counter
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel
 
-from src.core.constants import IDP_USERS_CSV_FILE_PATH, IDP_TEAMS_CSV_FILE_PATH
+from src.core.constants import settings
+from src.services.ldap_connection import connect_ldap, LdapSettings
 
 
 class IdpUser(BaseModel):
     """A class to hold IdP user information"""
-    model_config = ConfigDict(populate_by_name=True, strict=True, extra='ignore')
+    ref_id: str
+    name: str
+    email: str
+    phone_number: str
 
-    ref_id: str = Field(..., alias='ref_id')
-    name: str = Field(..., alias='name')
-    email: str = Field(..., alias='email')
-    phone_number: str = Field(..., alias='phone_number')
 
 class IdpTeam(BaseModel):
     """A class to hold IdP team information"""
-    model_config = ConfigDict(populate_by_name=True, strict=True, extra='ignore')
+    ref_id: str
+    name: str
+    parent_ref_id: Optional[str]
+    users: list[IdpUser]
 
-    ref_id: str = Field(..., alias='obj_id')
-    name: str = Field(..., alias='name')
-    parent_ref_id: str = Field(..., alias='parent_id')
-    users: list[IdpUser] = Field(...)
 
-def _data_from_csv(csv_file_path: str) -> list[dict[str, str]]:
-    """Create a list to store the data"""
-    with open(csv_file_path, 'r', encoding='utf-8') as csv_file:
-        return list(csv.DictReader(csv_file))
+class RawIdpUser(TypedDict):
+    distinguishedName: str
+    mail: str
+    displayName: str
+    mobile: Optional[str]
+
+
+class RawIdpTeam(TypedDict):
+    member: list[str]
+    memberOf: list[str]
+    distinguishedName: str
+    displayName: str
+
 
 def import_idp_users() -> list[IdpUser]:
     """Import users from IdP"""
-    file_path = IDP_USERS_CSV_FILE_PATH
-    assert file_path is not None
-    raw_idp_users = _data_from_csv(file_path)
-    return [IdpUser(**raw_idp_user) for raw_idp_user in raw_idp_users]
+    raw_idp_users: list[RawIdpUser] = []
 
-def import_idp_teams(idp_users: list[IdpUser]) -> list[IdpTeam]:
+    if settings.IS_RUNNING_LOCALLY:
+        with open('fixtures/ldap_test_data.json') as f:
+            raw_idp_users = json.load(f)['users']
+    else:
+        with connect_ldap() as conn:
+            ldap_settings = LdapSettings()
+            for ou in ldap_settings.LDAP_USER_OUS.split(','):
+                conn.search(
+                    search_base=f'OU={ou},{ldap_settings.LDAP_SEARCH_BASE}',
+                    search_filter='(objectclass=*)',
+                    attributes=['distinguishedName', 'mail', 'displayName', 'mobile']
+                )
+                assert conn.response is not None, f'No response from the IdP for OU: {ou}'
+                raw_idp_users += [e['attributes'] for e in conn.response]
+
+    return [IdpUser(
+        ref_id=raw_user['distinguishedName'],
+        name=raw_user['displayName'],
+        email=raw_user['mail'],
+        phone_number=raw_user.get('mobile') or ''
+    ) for raw_user in raw_idp_users]
+
+
+def import_idp_teams() -> list[IdpTeam]:
     """Import teams from IdP"""
-    file_path = IDP_TEAMS_CSV_FILE_PATH
-    assert file_path is not None
+    idp_users = import_idp_users()
     idp_users_by_ref_id = {idp_user.ref_id: idp_user for idp_user in idp_users}
-    raw_idp_teams = _data_from_csv(file_path)
-    idp_teams = []
-    for raw_idp_team in raw_idp_teams:
-        users = [idp_users_by_ref_id[ref_id] for ref_id in raw_idp_team['user_ref_ids'].split(',')
-                 if ref_id in idp_users_by_ref_id]
-        idp_team = IdpTeam(users=users, **raw_idp_team)
-        idp_teams.append(idp_team)
 
-    # ATTENTION: Assert that all ref_ids are unique
-    ref_ids = [team.ref_id for team in idp_teams]
-    counter = Counter(ref_ids)
-    duplicates = [ref_id for ref_id, count in counter.items() if count > 1]
-    assert not duplicates, f'Duplicated ref_id(s) from the IdP: {duplicates}'
+    raw_idp_teams: list[RawIdpTeam] = []
 
-    return idp_teams
+    if settings.IS_RUNNING_LOCALLY:
+        with open('fixtures/ldap_test_data.json') as f:
+            raw_idp_teams = json.load(f)['groups']
+    else:
+        with connect_ldap() as conn:
+            ldap_settings = LdapSettings()
+            for ou in ldap_settings.LDAP_GROUP_OUS.split(','):
+                conn.search(
+                    search_base=f'OU={ou},{ldap_settings.LDAP_SEARCH_BASE}',
+                    search_filter='(objectclass=*)',
+                    attributes=['distinguishedName', 'member', 'memberOf', 'displayName']
+                )
+                assert conn.response is not None, f'No response from the IdP for OU: {ou}'
+                raw_idp_teams += [e['attributes'] for e in conn.response]
 
-
-# TODO: Implement this ldap function
-"""
-def _data_from_ldap():
-    tls_config = Tls(validate=ssl.CERT_REQUIRED, version=ssl.PROTOCOL_TLSv1_2)
-    server = Server(
-        os.environ.get("IDP_SERVER_DOMAIN"),
-        port=int(os.environ.get("IDP_SERVER_PORT")),
-        tls=tls_config,
-        get_info=ALL
-    )
-    conn = Connection(server,
-        user=os.environ.get("IDP_LDAP_USER"),
-        password=os.environ.get("IDP_LDAP_PASSWORD"),
-        auto_bind=True,
-        client_strategy=SYNC,
-        authentication=SIMPLE
-    )
-    ad_data = {}
-    targets = [
-        {
-            'attributes': ['distinguishedName', 'member', 'memberOf', 'displayName'],
-            'OUs': ['Groups'],
-            'results': [],
-            'label': 'teams'
-        },
-        {
-            'attributes': ['distinguishedName', 'mail', 'displayName', 'mobile'],
-            'OUs': ['Employee','Partners','VIP'],
-            'results': [],
-            'label': 'users'
-        }
+    return [IdpTeam(
+        ref_id=raw_team['distinguishedName'],
+        name=raw_team['displayName'],
+        parent_ref_id=(raw_team['memberOf'][0]
+                       if raw_team['memberOf'] else None),
+        users=[idp_users_by_ref_id[user_ref_id] for user_ref_id
+               in raw_team['member']
+               if user_ref_id in idp_users_by_ref_id]
+    ) for raw_team in raw_idp_teams
+        if not _check_for_exclusion(raw_team['distinguishedName'])
     ]
-    for target in targets:
-        for ou in target['OUs']:
-            conn.search(
-                search_base=f'OU={ou},OU=HQ,OU=YOUR_ORG_NAME,DC=xxxx,DC=co,DC=kr',
-                search_filter='(objectclass=*)',
-                attributes=target['attributes'] #ALL_ATTRIBUTES
-            )
-            results = [dict(entry['attributes']) for entry in conn.response]
-            target['results'] += results
 
-        ad_data[target['label']] = target['results']
 
-"""
+_teams_to_exclude = set(settings.TEAMS_TO_EXCLUDE.split(','))
+
+
+def _check_for_exclusion(distinguished_name: str) -> bool:
+    pattern = re.compile(r"CN=([^,]+)")
+    matches = pattern.findall(distinguished_name)
+    return len(set(matches) & _teams_to_exclude) > 0

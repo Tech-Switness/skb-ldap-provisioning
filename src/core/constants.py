@@ -1,33 +1,34 @@
-import os
-import dotenv
+from typing import Optional
 
-dotenv.load_dotenv()
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-IS_RUNNING_LOCALLY = bool(os.environ.get('IS_RUNNING_LOCALLY'))
-SWIT_CLIENT_ID = os.environ.get('SWIT_CLIENT_ID')
-SWIT_CLIENT_SECRET = os.environ.get('SWIT_CLIENT_SECRET')
-OPERATION_AUTH_KEY = os.environ.get('OPERATION_AUTH_KEY')
 
-# In case of using a daily scheduler
-SCHEDULE_TIME = os.environ.get('SCHEDULE_TIME')  # example: '20:00'. If you don't want to use scheduler, set None.
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
 
-# New user's default settings
-DEFAULT_USER_LANGUAGE = os.environ.get('DEFAULT_USER_LANGUAGE') or 'en'
-DEFAULT_USER_TIMEZONE = os.environ.get('DEFAULT_USER_TIMEZONE') or 'Asia/Seoul'
+    IS_RUNNING_LOCALLY: bool = False
+    SWIT_CLIENT_ID: str
+    SWIT_CLIENT_SECRET: str
+    OPERATION_AUTH_KEY: str
 
-# Logger
-SWIT_WEBHOOK_URL = os.environ.get('SWIT_WEBHOOK_URL')
+    # In case of using a daily scheduler
+    SCHEDULE_TIME: Optional[str] = None  # example: '20:00'. If you don't want to use scheduler, set None.
 
-# In case of using CSV
-IDP_USERS_CSV_FILE_PATH = os.environ.get('IDP_USERS_CSV_FILE_PATH')
-IDP_TEAMS_CSV_FILE_PATH = os.environ.get('IDP_TEAMS_CSV_FILE_PATH')
+    # New user's default settings
+    DEFAULT_USER_LANGUAGE: str = 'en'
 
-# In case of using DB
-DB_HOST = os.environ.get('DB_HOST') or 'localhost'
-DB_PORT = int(os.environ.get('DB_PORT') or '3306')
-DB_NAME = os.environ.get('DB_NAME')
-DB_USERNAME = os.environ.get('DB_USERNAME')
-DB_PASSWORD = os.environ.get('DB_PASSWORD')
+    # Logger
+    SWIT_WEBHOOK_URL: Optional[str] = None
 
-# For testing
-SWIT_BASE_URL = os.environ.get('SWIT_BASE_URL') or 'https://openapi.swit.io'
+    # For API
+    SWIT_BASE_URL: str = 'https://openapi.swit.io'
+
+    # For provisioning
+    TEAMS_TO_EXCLUDE: str = ''
+
+
+settings = Settings()
