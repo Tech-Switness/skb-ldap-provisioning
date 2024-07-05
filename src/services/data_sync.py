@@ -198,8 +198,9 @@ class SyncTeams(Sync):
                 # If the team is in IdP
                 continue
             try:
-                self._api_client.post('/team.delete',
+                res = self._api_client.post('/team.delete',
                                       json={'id': swit_team.id})
+                print(team, 324)
             except HTTPStatusError as e:
                 # If the team has already been deleted
                 print(123, swit_team, e)
