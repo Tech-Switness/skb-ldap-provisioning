@@ -187,24 +187,23 @@ class SyncTeams(Sync):
         self._remove_unused()
         self._create()
         self._update()
+        """ SKB에서 사용하지 않음
         self._sort()
+        """
 
     def _remove_unused(self) -> None:
         print("Removing unused teams...")
         swit_teams_by_ref, all_swit_teams, root_team_id = self._get_existing_swit_teams()
-        print("count",len(all_swit_teams))
         idp_team_ref_ids = {team.ref_id for team in self._idp_teams}
         for swit_team in all_swit_teams:
             if swit_team.ref_id in idp_team_ref_ids:
                 # If the team is in IdP
                 continue
             try:
-                res = self._api_client.post('/team.delete',
+                self._api_client.post('/team.delete',
                                       json={'id': swit_team.id})
-                print(res, swit_team, 324)
             except HTTPStatusError as e:
                 # If the team has already been deleted
-                print(123, swit_team, e)
                 logger.info(f"Team {swit_team.name} has already been deleted")
                 pass
             time.sleep(_SLEEP_TIME)
