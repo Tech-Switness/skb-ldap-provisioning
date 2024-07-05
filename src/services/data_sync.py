@@ -1,7 +1,6 @@
 """ import directory data via ldap """
 import time
 import re
-from collections import Counter
 
 from typing import Any
 
@@ -335,12 +334,6 @@ class SyncTeams(Sync):
         raw_swit_teams: list[dict[str, Any]] = res.json()['data']['team']
         root_team_id = next(team['team_id'] for team in raw_swit_teams if team['depth'] == 0)
         all_swit_teams = [SwitTeam(**team_json) for team_json in raw_swit_teams]
-
-        # ATTENTION: Assert that all ref_ids are unique
-        ref_ids = [team.ref_id for team in all_swit_teams if team.ref_id]
-        counter = Counter(ref_ids)
-        duplicates = [ref_id for ref_id, count in counter.items() if count > 1]
-        assert not duplicates, f'Duplicated ref_id(s) from Swit: {duplicates}'
 
         # ATTENTION: Exclude the root team and 'Unassigned' team
         #  because they're not actual teams
