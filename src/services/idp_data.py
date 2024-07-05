@@ -59,7 +59,7 @@ def import_idp_users() -> list[IdpUser]:
 
     return [IdpUser(
         ref_id=raw_user['distinguishedName'],
-        name=raw_user['displayName'],
+        name=raw_user['displayName'].split("/")[0],
         email=raw_user['mail'],
         phone_number=raw_user.get('mobile') or ''
     ) for raw_user in raw_idp_users if raw_user['mail']]

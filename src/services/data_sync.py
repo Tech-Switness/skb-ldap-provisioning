@@ -74,7 +74,11 @@ class SyncUsers(Sync):
         super().__init__()
         self._idp_users = import_idp_users()
         self._create_and_update()
+
+        # TODO
+        """ SKB는 현재 IdP 기준으로 활성 여부를 제어하고 있지 않음
         self._update_active_status()
+        """
 
     def _create_and_update(self) -> None:
         print("Syncing users...")
@@ -83,6 +87,8 @@ class SyncUsers(Sync):
         for idp_user in self._idp_users:
             swit_user = swit_users_by_email.get(idp_user.email)
 
+            # TODO
+            """ SKB는 이 기능을 사용하는 대신 SSO를 통해 회원 가입
             # Create a new user if it doesn't exist on Swit
             if not swit_user:
                 username = _clean_string(idp_user.name)
@@ -103,6 +109,9 @@ class SyncUsers(Sync):
                                       json={'id': swit_user.id})
                 logger.info(f"Activated user: {swit_user.name}")
                 time.sleep(_SLEEP_TIME)
+            """
+            if not swit_user:
+                continue
 
             # TODO: Replace the SCIM API with the new API when it's ready
             operations = []
