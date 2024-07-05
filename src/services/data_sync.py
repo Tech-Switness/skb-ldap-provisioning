@@ -200,7 +200,7 @@ class SyncTeams(Sync):
             try:
                 res = self._api_client.post('/team.delete',
                                       json={'id': swit_team.id})
-                print(team, 324)
+                print(res, swit_team, 324)
             except HTTPStatusError as e:
                 # If the team has already been deleted
                 print(123, swit_team, e)
