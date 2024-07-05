@@ -261,13 +261,17 @@ class SyncTeams(Sync):
 
             # Update team info if necessary
             if fields_to_update:
-                self._api_client.post(
-                    '/team.update',
-                    json=SwitTeamRequest(
-                        id=swit_team.id,
-                        **fields_to_update
-                    ).model_dump(exclude_none=True, by_alias=True))
-                logger.info(f"Updated team: {swit_team.name}")
+                try:
+                    self._api_client.post(
+                        '/team.update',
+                        json=SwitTeamRequest(
+                            id=swit_team.id,
+                            **fields_to_update
+                        ).model_dump(exclude_none=True, by_alias=True))
+                    logger.info(f"Updated team: {swit_team.name}")
+                except HTTPStatusError as e:
+                    logger.error(f"Failed to update team: {swit_team.name}")
+                    logger.exception(e)
                 time.sleep(_SLEEP_TIME)
 
             # Check that team members are up-to-date
