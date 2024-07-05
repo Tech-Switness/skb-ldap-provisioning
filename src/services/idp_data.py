@@ -62,7 +62,7 @@ def import_idp_users() -> list[IdpUser]:
         name=raw_user['displayName'],
         email=raw_user['mail'],
         phone_number=raw_user.get('mobile') or ''
-    ) for raw_user in raw_idp_users]
+    ) for raw_user in raw_idp_users if raw_user['mail']]
 
 
 def import_idp_teams() -> list[IdpTeam]:
