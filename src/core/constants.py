@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     SWIT_CLIENT_SECRET: str
     OPERATION_AUTH_KEY: str
 
+    PORT: int = 5000
+
     # In case of using a daily scheduler
     SCHEDULE_TIME: Optional[str] = None  # example: '20:00'. If you don't want to use scheduler, set None.
 

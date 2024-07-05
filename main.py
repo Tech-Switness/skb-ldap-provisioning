@@ -12,6 +12,7 @@ if __name__ == "__main__":
             scheduler.initialize()
         app.run(
             host='0.0.0.0',
+            port=settings.PORT,
             debug=settings.IS_RUNNING_LOCALLY
         )
     finally:
