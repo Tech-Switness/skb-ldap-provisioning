@@ -192,6 +192,7 @@ class SyncTeams(Sync):
     def _remove_unused(self) -> None:
         print("Removing unused teams...")
         swit_teams_by_ref, all_swit_teams, root_team_id = self._get_existing_swit_teams()
+        print("count",len(all_swit_teams))
         idp_team_ref_ids = {team.ref_id for team in self._idp_teams}
         for swit_team in all_swit_teams:
             if swit_team.ref_id in idp_team_ref_ids:
