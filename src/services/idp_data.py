@@ -96,7 +96,7 @@ def import_idp_teams() -> list[IdpTeam]:
                in raw_team['member']
                if user_ref_id in idp_users_by_ref_id]
     ) for raw_team in raw_idp_teams
-        if not _check_for_exclusion(raw_team['distinguishedName'])
+        if raw_team['displayName'] and not _check_for_exclusion(raw_team['distinguishedName'])
     ]
 
 
