@@ -1,6 +1,7 @@
 """ import directory data via ldap """
 import time
 import re
+from collections import Counter
 
 from typing import Any
 
@@ -201,6 +202,7 @@ class SyncTeams(Sync):
                                       json={'id': swit_team.id})
             except HTTPStatusError:
                 # If the team has already been deleted
+                logger.info(f"Team {swit_team.name} has already been deleted")
                 pass
             time.sleep(_SLEEP_TIME)
 
@@ -333,12 +335,30 @@ class SyncTeams(Sync):
         res = self._api_client.get('/user.team.list')
         raw_swit_teams: list[dict[str, Any]] = res.json()['data']['team']
         root_team_id = next(team['team_id'] for team in raw_swit_teams if team['depth'] == 0)
-        all_swit_teams = [SwitTeam(**team_json) for team_json in raw_swit_teams]
+        all_swit_teams = [SwitTeam.model_validate(team_json) for team_json in raw_swit_teams]
+
+        # ATTENTION: Ensure that all ref_ids are unique
+        ref_ids = [team.ref_id for team in all_swit_teams if team.ref_id]
+        counter = Counter(ref_ids)
+        duplicates = [ref_id for ref_id, count in counter.items() if count > 1]
+        deleted_team_ids = []
+        for duplicate in duplicates:
+            duplicate_teams = [team for team in all_swit_teams if team.ref_id == duplicate]
+            # Keep the team with the most members
+            duplicate_teams.sort(key=lambda team: len(team.user_ids), reverse=True)
+            for team in duplicate_teams[1:]:
+                try:
+                    self._api_client.post('/team.delete',
+                                          json={'id': team.id})
+                except HTTPStatusError:
+                    pass
+                deleted_team_ids.append(team.id)
 
         # ATTENTION: Exclude the root team and 'Unassigned' team
         #  because they're not actual teams
         all_swit_teams = [team for team in all_swit_teams
-                          if team.id != root_team_id and team.name != 'Unassigned']
+                          if team.id != root_team_id and team.name != 'Unassigned'
+                          and team.id not in deleted_team_ids]
         swit_teams_by_ref = {
             swit_team.ref_id: swit_team
             for swit_team in all_swit_teams if swit_team.ref_id

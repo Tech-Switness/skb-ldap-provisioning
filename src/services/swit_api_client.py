@@ -41,7 +41,7 @@ class SwitApiClient(Client):
             res = self.request(*args, **kwargs)
 
         if not res.is_success:
-            logger.error(f"Request: {res.request.content.decode('utf-8')}")
+            logger.error(f"Failed request: {res.request.content.decode('utf-8')}")
         res.raise_for_status()
         return res
 
