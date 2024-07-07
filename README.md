@@ -1,4 +1,22 @@
-# Provisioning Example
+# SKB LDAP Provisioning
+
+- 이 프로젝트는 SKB LDAP에서 사용하는 LDAP 서버에 접속하여 사용자와 팀 정보를 가져와 Swit에 반영하는 기능을 제공합니다.
+- 이 프로젝트는 [공개 리포](https://github.com/swit-developers/provisioning-example)를 fork하여 SKB LDAP에 맞게 수정한 코드입니다.
+  - 해당 리포는 프로비저닝을 직접 구현하고자 하는 고객사들이 종종 있어서 예제 코드를 제공하고자 만들었습니다.
+- 공개 리포와 비교했을 때 특히 다음 사항은 SKB에서 사용하지 않으므로 주석 처리했습니다.
+  - 신규 유저 생성(이 부분은 SSO로 대체합니다)
+  - 유저 활성/비활성
+  - 팀 순서 정렬
+- 동기화 batch가 구동되는 시점
+  1. main.py를 실행했을 때
+  2. 매일 UTC 20:00(한국시간 05:00)에 스케줄러가 실행될 때
+- 또한 Flask 서버(포트 6000)를 구동하고 있으며 http 통신으로도 batch 구동이 가능하기는 하지만, SKB의 유즈케이스만 보면 사실 필요하지는 않습니다. 어차피 이 프로젝트가 구동되는 VM을 외부에서 http로 접근할 수 없기 때문입니다.
+- 웹을 통한 OAuth도 불가능하므로 혹시 토큰을 다시 입력해야 한다면, VM으로 직접 들어와서 `service_accounts.db` 파일을 cli로 직접 수정해주세요(sqlite 기반).
+- VM과 관련한 구체적인 사항은 SRE 팀에 문의해주세요.
+- SKB 조직 내에서 정상 작동을 확인하려면 https://swit-tech.atlassian.net/wiki/spaces/URD/pages/2109145141/SKB+PC 참고
+
+-------------------------------------------
+아래는 원본 리포 README.md 내용
 
 This repository contains a Flask application designed for provisioning user and team data from an Identity Provider (IdP) to a designated Swit organization.
 
